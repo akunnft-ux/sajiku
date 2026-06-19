@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireRole } from "@/lib/auth"
 import { ROLES, ORDER_STATUS } from "@/lib/constants"
 import { revalidatePath } from "next/cache"
@@ -22,7 +22,9 @@ export async function findOrderByCode(code: string) {
 export async function processPayment(orderId: string) {
   const session = await requireRole([ROLES.KASIR])
 
-  const supabase = await createClient()
+  // Use service client — kasir UPDATE RLS policy has broken with check
+  // (defaults to status='Siap' which rejects the status change to 'Dibayar')
+  const supabase = createServiceClient()
 
   const { data: order } = await supabase
     .from("orders")
