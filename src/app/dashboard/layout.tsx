@@ -2,11 +2,13 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { logout } from "@/features/auth/actions"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { ROLES } from "@/lib/constants"
+import { ROLES, type Role } from "@/lib/constants"
 
-const NAV_ITEMS = [
+const NAV_ITEMS: { href: string; label: string; roles: Role[] }[] = [
   { href: "/dashboard", label: "📋 Pesanan", roles: [ROLES.PENJUAL] },
   { href: "/dashboard/menu", label: "📦 Menu", roles: [ROLES.PENJUAL] },
   { href: "/dashboard/kasir", label: "👤 Kasir", roles: [ROLES.PENJUAL] },
@@ -20,6 +22,19 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const [userRole, setUserRole] = useState<Role | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const role = data.user?.user_metadata?.role as Role | undefined
+      setUserRole(role ?? null)
+    })
+  }, [])
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => userRole && item.roles.includes(userRole)
+  )
 
   return (
     <div className="flex min-h-screen bg-slate-50">
@@ -31,7 +46,7 @@ export default function DashboardLayout({
           </Link>
         </div>
         <nav className="space-y-1 px-3">
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -76,7 +91,7 @@ export default function DashboardLayout({
 
         {/* Mobile Bottom Nav */}
         <nav className="flex border-t bg-white md:hidden">
-          {NAV_ITEMS.map((item) => (
+          {visibleItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
