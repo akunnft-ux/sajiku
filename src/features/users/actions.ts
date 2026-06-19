@@ -1,6 +1,6 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { requireRole } from "@/lib/auth"
 import { ROLES } from "@/lib/constants"
 import { revalidatePath } from "next/cache"
@@ -15,10 +15,10 @@ export async function createKasir(input: { username: string; password: string })
   const session = await requireRole([ROLES.PENJUAL])
   const parsed = createKasirSchema.parse(input)
 
-  const supabase = await createClient()
+  const serviceSupabase = createServiceClient()
 
-  // Create user via Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+  // Create user via Supabase Auth (requires service_role key)
+  const { data: authData, error: authError } = await serviceSupabase.auth.admin.createUser({
     email: `${parsed.username}@sajiku.local`,
     password: parsed.password,
     email_confirm: true,
@@ -30,8 +30,8 @@ export async function createKasir(input: { username: string; password: string })
 
   if (authError) throw new Error(authError.message)
 
-  // Insert into users table
-  const { error } = await supabase.from("users").insert({
+  // Insert into users table (bypass RLS via service role)
+  const { error } = await serviceSupabase.from("users").insert({
     id: authData.user.id,
     username: parsed.username,
     password_hash: "",
