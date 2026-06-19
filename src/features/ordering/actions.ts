@@ -1,7 +1,7 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
-import { requireRole, requireAuth } from "@/lib/auth"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { requireRole } from "@/lib/auth"
 import { createOrderSchema, type CreateOrderInput } from "./schema"
 import { ROLES, ORDER_STATUS } from "@/lib/constants"
 import { generatePaymentCode } from "@/lib/payment-code"
@@ -10,7 +10,8 @@ import { revalidatePath } from "next/cache"
 export async function createOrder(input: CreateOrderInput) {
   const parsed = createOrderSchema.parse(input)
 
-  const supabase = await createClient()
+  // Use service client to bypass missing anon role grants on orders/order_items
+  const supabase = createServiceClient()
 
   // Fetch current prices for all ordered items
   const { data: menuItems } = await supabase
@@ -131,9 +132,7 @@ export async function markOrderReady(orderId: string) {
 }
 
 export async function cancelOrder(orderId: string, reason: string) {
-  const session = await requireAuth()
-
-  const supabase = await createClient()
+  const supabase = createServiceClient()
 
   const { data: order } = await supabase
     .from("orders")
@@ -149,7 +148,7 @@ export async function cancelOrder(orderId: string, reason: string) {
     .update({
       status: ORDER_STATUS.DIBATALKAN,
       cancelled_at: new Date().toISOString(),
-      cancelled_by: session.id,
+      cancelled_by: null,
       cancel_reason: reason,
     })
     .eq("id", orderId)
@@ -179,7 +178,8 @@ export async function getOrders(statusFilter?: string) {
 }
 
 export async function getOrderById(orderId: string) {
-  const supabase = await createClient()
+  // Use service client — no public SELECT policy exists for orders/order_items
+  const supabase = createServiceClient()
 
   const { data, error } = await supabase
     .from("orders")
